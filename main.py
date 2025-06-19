@@ -221,6 +221,47 @@ def addallfiles(dir_path, flag):
         elif item!='.jit':
             add(item,full_path) 
 
+def rmadd(base_directory, filename=None):
+    jit_path = os.path.join(base_directory, ".jit") 
+    added_path = os.path.join(jit_path, "branches", "main", "added.json")
+
+    if not os.path.exists(added_path):
+        print("Files have not been tracked yet or added.json doesn't exist. Use add command to track files.")
+        return
+
+    if filename is None:
+        remove_from_json(added_path)
+        print("All files successfully removed from tracking.")
+    else:
+        remove_specific_file_from_json(added_path, filename)
+
+def remove_specific_file_from_json(json_path, filename):
+    try:
+        with open(json_path, "r") as json_file:
+            data = json.load(json_file) #load it's content into data
+
+        if filename in data:
+            del data[filename] #if filename present, delete that from data
+            with open(json_path, "w") as json_file:
+                json.dump(data, json_file, indent=4) #dump the updated data
+            print(f"File '{filename}' successfully removed from tracking.")
+        else:
+            print(f"File '{filename}' is not currently added/tracked.")
+
+    except FileNotFoundError:
+        print(f"Error: File '{json_path}' not found.")
+    except json.JSONDecodeError:
+        print("Error reading JSON file. Possibly corrupted.")
+
+def remove_from_json(json_path):
+    try:
+        with open(json_path, "w") as json_file:
+            json_file.write("{}") #open json file and overwrites it with {} empty list
+    except FileNotFoundError:
+        print(f"Error: File '{json_path}' not found.")
+        return
+
+
 while True:
     
     if universal_dir_path==None:
@@ -319,5 +360,24 @@ while True:
             
             add(args[1], file_path)
             print()
+        
+    elif args[0] == "rmadd":
+        if not os.path.exists(universal_dir_path + "/.jit"):
+            print("Exiting program, This folder has not been initialized / .jit doesn't exist. Use init command to initialize.")
+            print()
+            continue
+
+        if len(args) > 2:
+            print("Wrong syntax for rmadd. Usage:")
+            print(" - rmadd              → to remove all added files")
+            print(" - rmadd <filename>   → to remove a specific file from tracking")
+            print()
+            continue
+
+        filename = args[1] if len(args) == 2 else None
+        rmadd(universal_dir_path, filename)
+        print()
+
     
+        
    
