@@ -221,6 +221,7 @@ def addallfiles(dir_path, flag):
         elif item!='.jit':
             add(item,full_path) 
 
+#rmadd logic
 def rmadd(base_directory, filename=None):
     jit_path = os.path.join(base_directory, ".jit") 
     added_path = os.path.join(jit_path, "branches", "main", "added.json")
@@ -261,6 +262,38 @@ def remove_from_json(json_path):
         print(f"Error: File '{json_path}' not found.")
         return
 
+#show username logic
+def extract_username_from_file(dir_path):
+    
+    file_path = os.path.join(dir_path,".jit","branches","main","users")
+    
+    try:
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+            for line in lines:
+                if "User:" in line:
+                    username = line.split("User:")[1].strip()
+                    return username
+            return None
+    except FileNotFoundError:
+        return None
+    
+#change username logic
+def change_user_name(dir_path, new_username):
+    
+    file_path = os.path.join(dir_path,".jit","branches","main","users")
+    old_user = extract_username_from_file(dir_path)
+    
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    with open(file_path, 'w') as file:
+        for line in lines:
+            if "User:" in line:
+                line = line.replace(line.split("User:")[1].strip(), new_username)
+            file.write(line)
+
+    print(f"Username changed to '{new_username}' in users.txt.")
 
 while True:
     
@@ -377,7 +410,103 @@ while True:
         filename = args[1] if len(args) == 2 else None
         rmadd(universal_dir_path, filename)
         print()
-
     
+    elif args[0] == "clear":
         
-   
+        if len(args)>1:
+            print("Wrong syntax for log. Use 'log'.")
+            print()
+            continue
+        
+        if os.name == 'posix': #On Linux or macOS, os.name is 'posix'
+            os.system('clear')
+            
+        elif os.name == 'nt':  #On Windows, os.name is 'nt'
+            os.system('cls')
+            
+        else:
+            print("Clear screen command not supported on this platform.")
+            print()
+            continue
+    
+    elif args[0] == "user" and len(args)>=2 and args[1]=="show":
+        if not os.path.exists(universal_dir_path + "/.jit"):
+            print("Exiting program, This folder has not been initialized/ .jit doesn't exist, Use init command to initialize ")
+            print()
+            continue
+        
+        if not os.path.exists(os.path.join(universal_dir_path,".jit","branches","main","users")):
+            print("Error. The users.txt file has been deleted or has been moved. kindly check")
+            print()
+            continue
+
+        if len(args) == 2 and args[1] == "show":
+            user = extract_username_from_file(universal_dir_path)
+            print(f"user : {user}")
+            print()
+            
+        else:
+            print("Wrong syntax for user. Use 'user show'.")
+            print()
+            continue
+
+    elif args[0] == "user" and len(args)>=3 and args[1]=="set":
+        
+        if not os.path.exists(universal_dir_path + "/.jit"):
+            print("Exiting program, This folder has not been initialized/ .jit doesn't exist, Use init command to initialize ")
+            print()
+            continue
+        
+        if not os.path.exists(os.path.join(universal_dir_path,".jit","branches","main","users")):
+            print("Error. The users.txt file has been deleted or has been moved. kindly check")
+            print()
+            continue
+    
+        if len(args) == 3 and args[1] == "set":
+            username = args[2]
+            change_user_name(universal_dir_path, username)
+            print()
+            
+        else:
+            print("Wrong syntax for user set. Use 'user set <username>'.")
+            print()
+            continue
+
+    elif args[0] == "ls":
+        if len(args) != 2:
+            print("Invalid syntax for ls. Use 'ls <path>'.")
+            print()
+            continue
+
+        dest_path = args[1] 
+
+        if not os.path.exists(dest_path):
+            print(f"The specified path '{dest_path}' does not exist.")
+            print("Syntax for ls: Use 'ls <path>'.")
+            print()
+            continue
+
+        if not os.path.isdir(dest_path):
+            print(f"The specified path '{dest_path}' is not a directory.")
+            print("Syntax for ls: Use 'ls <path>'.")
+            print()
+            continue
+
+        all_files = []
+        get_all_files(dest_path, all_files)
+
+        if not all_files:
+            print(f"No files found in '{dest_path}'.")
+        else:
+            print(f"Files in '{dest_path}':")
+            for file_path in all_files:
+                print(f"  - {file_path}")
+        print()
+
+    elif args[0] == "exit":
+        break
+
+    else:
+        print("Invalid command. Please try again.")
+        print()
+    
