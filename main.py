@@ -3,7 +3,7 @@ import hashlib
 import shutil
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 import platform
 import numpy as np
 import base64
@@ -295,6 +295,106 @@ def change_user_name(dir_path, new_username):
 
     print(f"Username changed to '{new_username}' in users.txt.")
 
+  
+def encode_file_content_to_base64(file_path):
+    with open(file_path, 'rb') as file:
+        binary_data = file.read()
+        return base64.b64encode(binary_data).decode('utf-8')  
+
+def commits(base_directory, message):
+    
+    jit_path = os.path.join(base_directory, ".jit")
+    added_path = os.path.join(jit_path, "branches", "main", 'added.json')
+    commits_path = os.path.join(jit_path, 'objects', 'commits.json') #this file contains previous commits 
+    md5_hash_path = os.path.join(jit_path, 'objects', 'files_md5_hash.json') #this file contains md5 hash of previous commits
+    
+    if not os.path.exists(added_path):
+        print("Files have not been tracked yet. Use the add command to track files. After that, you can use the commit command.")
+        return
+
+    # Create an empty MD5 hash dictionary if the file doesn't exist
+    md5_hash_data = {} # hash of last committed files
+    if os.path.exists(md5_hash_path):
+        with open(md5_hash_path, 'r') as md5_hash_file:
+            md5_hash_data = json.load(md5_hash_file)
+    
+    commits = []
+    
+    if os.path.exists(commits_path):
+        with open(commits_path, 'r') as commits_file:
+            commits = json.load(commits_file)
+        
+    with open(added_path, 'r') as added_file:
+        added_data = json.load(added_file)
+ 
+    username = extract_username_from_file(universal_dir_path)
+    
+    commit = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user-name": username, 
+        "message": message,
+        "date": datetime.now(timezone.utc).strftime("%d-%m-%Y"),
+        "commit_hash": None,  # Placeholder for the commit-specific hash
+        "files": []
+    }
+
+    # Calculate a unique MD5 hash for this commit based on timestamp and files
+    commit_hash_input = f"{commit['timestamp']}:{json.dumps(commit['files'], sort_keys=True)}"
+    commit_hash = hashlib.md5(commit_hash_input.encode()).hexdigest()
+    commit["commit_hash"] = commit_hash
+    untracked_files = []
+    isdeleted = False
+    
+    # Iterate over a list of keys to avoid dictionary size change during iteration
+    for filename in list(added_data.keys()):
+        file_info = added_data[filename]
+        file_path = file_info.get("file_path")
+        if os.path.exists(file_path):
+            actual_md5 = compute_md5(file_path)
+            encoded_content = encode_file_content_to_base64(file_path)
+            #File Already Committed, No Change
+            if actual_md5 == md5_hash_data.get(file_path):
+                # print(f"No changes made to file '{filename}'. Skipping.")
+                untracked_files.append({"filename": filename, "file_path": file_path, "encoded_content": encoded_content})
+                continue
+            #File Hash Matches the Hash When Added
+            if actual_md5 == file_info.get("md5 hash"):
+                commit["files"].append({"filename": filename, "file_path": file_path, "encoded_content": encoded_content})
+                md5_hash_data[file_path] = actual_md5  # Update the MD5 hash in the dictionary
+            else:
+                print(f"Warning: File '{filename}' has changed. Kindly use the Add command first.")
+                return
+        else:
+            print(f"Warning: File '{filename}' not found. Removed from added.json.")
+            isdeleted = True
+            del added_data[filename]  # Remove the not found file from added_data
+
+    # Update added.json with the remaining files
+    with open(added_path, 'w') as added_file:
+        json.dump(added_data, added_file, indent=2)
+        added_file.write('\n')        
+
+    # Check if commit has files before appending it to commits
+    if isdeleted:
+        for item in untracked_files:
+            commit["files"].append(item)
+    # Check Whether We Have Anything to Commit
+    if commit["files"]:
+        commits.append(commit)
+    
+        with open(commits_path, 'w') as commits_file:
+            json.dump(commits, commits_file, indent=2)
+            commits_file.write('\n')
+
+        print("Commit Successful")
+    else:
+        print("No changes made. Commit skipped.")
+
+    with open(md5_hash_path, 'w') as md5_hash_file:
+        json.dump(md5_hash_data, md5_hash_file, indent=2)
+        md5_hash_file.write('\n')
+        
+
 while True:
     
     if universal_dir_path==None:
@@ -469,6 +569,38 @@ while True:
             
         else:
             print("Wrong syntax for user set. Use 'user set <username>'.")
+            print()
+            continue
+    
+    elif args[0] == "commit":
+        if not os.path.exists(universal_dir_path + "/.jit"):
+            print("Exiting program, This folder has not been initialized/ .jit doesn't exist, Use init command to initialize ")
+            print()
+            continue
+
+        if args[1] == "-m":
+            if args[2][0] == '"' and args[-1][-1] == '"':
+                commit_message = " ".join(args[2:])
+                commit_message = commit_message[1:-1]  
+                flag1 = False
+                
+                for i in commit_message:
+                    if i!=' ':
+                        flag1 = True
+
+                if flag1==False:
+                    print("Cannot commit with empty message kindly recompile")
+                    print()
+                    continue
+                        
+                commits(universal_dir_path, commit_message)
+                print()
+            else:
+                print("Invalid commit command. Use 'commit -m \"message\"'.")
+                print()
+                continue
+        else:
+            print("Invalid commit command. Use 'commit -m \"message\"'.")
             print()
             continue
 
