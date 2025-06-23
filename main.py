@@ -295,7 +295,8 @@ def change_user_name(dir_path, new_username):
 
     print(f"Username changed to '{new_username}' in users.txt.")
 
-  
+#commit logic  
+
 def encode_file_content_to_base64(file_path):
     with open(file_path, 'rb') as file:
         binary_data = file.read()
@@ -394,6 +395,113 @@ def commits(base_directory, message):
         json.dump(md5_hash_data, md5_hash_file, indent=2)
         md5_hash_file.write('\n')
         
+def remove_commit(commits_path):
+    if not os.path.exists(commits_path):
+        print("Error: 'commits.json' not found.")
+        return None
+    
+    with open(commits_path, 'r') as commits_file:
+        commits = json.load(commits_file)
+        
+    if not commits:
+        print("Error: No commits to remove.")
+        return None
+
+    removed_commit = commits.pop()
+    
+    if not commits:
+        print("Error: No commit left after removal.")
+        return None
+    
+    commit_before_removed = commits[-1]
+
+    with open(commits_path, 'w') as commits_file:
+        json.dump(commits, commits_file, indent=2)
+
+    print("Commit removed successfully:")
+
+    return commit_before_removed
+    
+def rmcommit(dir_path):
+    commits_path = os.path.join(dir_path,".jit","objects","commits.json")
+    
+    if(os.path.exists(commits_path)==False):
+        print("The path of commits.json has been changed. Kindly check if the file exists and it is placed in correct folder")
+        return
+    
+    to_be_restore = remove_commit(commits_path)
+    
+    if(to_be_restore):
+        decode_and_update_files(to_be_restore,dir_path, True)  
+
+def decode_and_update_files(commit, destination_folder, flag2):
+    
+    base_path = universal_dir_path
+    files = commit.get("files", [])
+    for file_data in files:
+        filename = file_data.get("filename")
+        encoded_content = file_data.get("encoded_content")
+        file_path = file_data.get("file_path")
+
+        try:
+            decoded_content = base64.b64decode(encoded_content)
+            relative_path = os.path.relpath(file_path, base_path)
+            destination_path = os.path.join(destination_folder, filename)
+            os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+
+            with open(destination_path, 'wb') as file:
+                file.write(decoded_content)
+
+            if flag2:
+                md5_hash_path = os.path.join(universal_dir_path,".jit",'objects', 'files_md5_hash.json')
+                md5_hash_data = {}
+                
+                actual_md5 = compute_md5(destination_path)
+                md5_hash_data[relative_path] = actual_md5
+
+                with open(md5_hash_path, 'w') as md5_hash_file:
+                    json.dump(md5_hash_data, md5_hash_file, indent=2)
+                    md5_hash_file.write('\n')
+                    
+            print(f"File '{filename}' updated/copied.")
+                    
+        except (PermissionError, FileNotFoundError) as e:
+            print(f"Error updating/copying file '{filename}': {str(e)}")
+            return None
+        
+        except Exception as e:
+            print(f"Unexpected error updating/copying file '{filename}': {str(e)}")
+            return None
+        
+    return True
+         
+#logs logic
+def display_logs(commits_path):
+    print()
+    try:
+        with open(commits_path, 'r') as commits_file:
+            commits_data = json.load(commits_file)
+
+        if commits_data:
+            print("Commits:")
+            print()
+            for commit in commits_data:
+                print(f"Commit Hash: {commit['commit_hash']}")
+                print(f"Timestamp: {commit['timestamp']}")
+                print(f"User: {commit['user-name']}")
+                print(f"Message: {commit['message']}")
+                print(f"Date: {commit['date']}")
+                print("Files:")
+                for file_info in commit['files']:
+                    print(f"  - Filename: {file_info['filename']}")
+                    print(f"    File Path: {file_info['file_path']}")
+                print("------------------------------")
+        else:
+            print("No commits found.")
+
+    except FileNotFoundError:
+        print(f"Error: File '{commits_path}' not found.")
+
 
 while True:
     
@@ -601,6 +709,43 @@ while True:
                 continue
         else:
             print("Invalid commit command. Use 'commit -m \"message\"'.")
+            print()
+            continue
+    
+    elif args[0] == "rmcommit":
+        if not os.path.exists(universal_dir_path + "/.jit"):
+            print("Exiting program, This folder has not been initialized/ .jit doesn't exist, Use init command to initialize ")
+            print()
+            continue
+
+        if len(args) > 1:
+            print("Wrong syntax for rmcommit. Kindly recompile.")
+            print()
+            continue
+
+        rmcommit(universal_dir_path)
+        print()
+
+
+    elif args[0] == "log":
+        
+        if not os.path.exists(universal_dir_path + "/.jit"):
+            print("Exiting program, This folder has not been initialized/ .jit doesn't exist, Use init command to initialize ")
+            print()
+            continue
+        
+        if not os.path.exists(os.path.join(universal_dir_path,".jit","objects","commits.json")):
+            print("commits.json doesnt exist. Kindly use add command and then commit command to create one or restore back the old one")
+            print() 
+            continue
+
+        if len(args) == 1:
+            commits_path = os.path.join(universal_dir_path, ".jit", "objects","commits.json")
+            display_logs(commits_path)
+            print()
+            
+        else:
+            print("Wrong syntax for log. Use 'log'.")
             print()
             continue
 
