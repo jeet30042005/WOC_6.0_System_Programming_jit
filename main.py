@@ -502,6 +502,30 @@ def display_logs(commits_path):
     except FileNotFoundError:
         print(f"Error: File '{commits_path}' not found.")
 
+#push logic
+def push(base_directory, destination_path):
+    jit_path = os.path.join(base_directory, ".jit")
+    commits_path = os.path.join(jit_path, 'objects', 'commits.json')
+    
+    if os.path.exists(destination_path)==False or destination_path[0]=='.':
+        print("Destination path/directory doesnt exist kindly check")
+        return
+
+    if not os.path.exists(commits_path):
+        print("No commits found. Use commit command to commit changes.")
+        return
+
+    with open(commits_path, 'r') as commits_file:
+        commits = json.load(commits_file)
+
+    if not commits:
+        print("No commits found. Use commit command to commit changes.")
+        return
+
+    last_commit = commits[-1]
+    
+    if decode_and_update_files(last_commit,destination_path,False):
+        print("commits successfully copied to destination folder")
 
 while True:
     
@@ -748,6 +772,17 @@ while True:
             print("Wrong syntax for log. Use 'log'.")
             print()
             continue
+
+    elif args[0] == "push":
+        if not os.path.exists(universal_dir_path + "/.jit"):
+            print("Exiting program, This folder has not been initialized/ .jit doesn't exist, Use init command to initialize ")
+            print()
+            continue
+        
+        dest_path = " ".join(args[1:]).strip('"')
+        push(universal_dir_path,dest_path)
+        print()
+      
 
     elif args[0] == "ls":
         if len(args) != 2:
