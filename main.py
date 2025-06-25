@@ -474,6 +474,49 @@ def decode_and_update_files(commit, destination_folder, flag2):
             return None
         
     return True
+
+def checkout_commit(md5_hash, dir_path):
+    commits_path = os.path.join(dir_path, ".jit", "objects", "commits.json")
+    md5_hash_path = os.path.join(dir_path, ".jit", "objects", "files_md5_hash.json")
+
+    try:
+        with open(commits_path, 'r') as commits_file:
+            commits_data = json.load(commits_file)
+
+        # Find the index of the commit with the specified MD5 hash
+        commit_index = None
+        for i, commit in enumerate(commits_data):
+            if commit['commit_hash'] == md5_hash:
+                commit_index = i
+                break
+
+        if commit_index is not None:
+            # Remove subsequent commits from the end
+            while len(commits_data) > commit_index + 1:
+                commits_data.pop()
+                
+            commit_to_checkout = commits_data[-1];
+            decode_and_update_files(commit_to_checkout, dir_path, True)
+            # Update MD5 hash file with the MD5 values from the specified commit
+            with open(md5_hash_path, 'w') as md5_hash_file:
+                md5_hash_data = {file_info['file_path']: compute_md5(file_info['file_path'])
+                                 for file_info in commits_data[-1]['files']}
+                json.dump(md5_hash_data, md5_hash_file, indent=2)
+                md5_hash_file.write('\n')
+
+            # Update commits.json with the remaining commit
+            with open(commits_path, 'w') as commits_file:
+                json.dump(commits_data, commits_file, indent=2)
+                commits_file.write('\n')
+
+            print(f"Checkout successful. Reverted to commit with hash: {md5_hash}")
+        else:
+            print(f"Error: Commit with hash {md5_hash} not found.")
+
+    except FileNotFoundError:
+        print(f"Error: File '{commits_path}' not found.")
+    except Exception as e:
+        print(f"Error: An unexpected error occurred: {str(e)}")
          
 #logs logic
 def display_logs(commits_path):
@@ -783,6 +826,20 @@ while True:
         push(universal_dir_path,dest_path)
         print()
       
+    elif args[0] == "checkout":
+        
+        if not os.path.exists(universal_dir_path + "/.jit"):
+            print("Exiting program, This folder has not been initialized/ .jit doesn't exist, Use init command to initialize ")
+            print()
+            continue
+        
+        if len(args)>2 or len(args)==1:
+            print("Wrong syntax for log. Use 'checkout <hash>'.")
+            print()
+            continue
+        
+        checkout_commit(args[1],universal_dir_path)
+        print()
 
     elif args[0] == "ls":
         if len(args) != 2:
